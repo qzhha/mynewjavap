@@ -12,5 +12,5 @@ int main()
 	}
 	ClassFile cf(f);
 	method_info* info = lookup_method(cf,"main");
-	//cf.print_method(info);
+	cf.print_method(info);
 }

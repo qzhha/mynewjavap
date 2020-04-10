@@ -147,9 +147,11 @@ struct exception_info {
 struct method_info {
 	u2  access_flags;
 	u2  name_index;
-	u2  descriptor_index;
 	u2  attributes_count;
 	attribute_info **attributes;
+	
+
+	void parse_descriptor(cp_utf8_info* info);
 };
 
 struct attribute_info {
@@ -178,17 +180,21 @@ struct attribute_code_info: public attribute_info {
 class ClassFile;
 
 
-
+class ClassFileMgr 
+{
+	public:
+		ClassFileMgr* getMe() {}
+	private:
+		ClassFileMgr(){}
+		~ClassFileMgr(){}
+		static ClassFileMgr* instance;	
+};
 
 method_info* lookup_method(ClassFile &cf,const char * str = "");
 
 class ClassFile {
 public:
-	u4 magic;
-	u2 minor_version;
-	u2 major_version;
-	u2 constant_pool_count;
-	cp_info **constant_pool;
+	std::map<u2,cp_info*> constant_pool;
 	u2 access_flags;
 	u2 this_class;
 	u2 super_class;
@@ -224,7 +230,7 @@ public:
 	void parse_field(std::ifstream &f);
 	void parse_method(std::ifstream &f);
 	void parse_attribute(std::ifstream &f);
-
+	
 
 	ClassFile() {}
 	ClassFile(std::ifstream &f);

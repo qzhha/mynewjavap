@@ -21,7 +21,7 @@ int byte1Leftshift_or_byte2_func(u1* bytes,int &startidx)
 	return (int)bytes[startidx++]<<8 | bytes[startidx++];
 }
 //[)
-std::map<int,std::pair<const char *,int (*)(u1* bytes,int &startidx)>> opcode_map = {
+const std::map<int,std::pair<const char *,int (*)(u1* bytes,int &startidx)>> opcode_map = {
 	{0x19,{"aload",u1_func}},
 	{0xb2,{"getstatic",byte1Leftshift_or_byte2_func}},
 	{0x12,{"ldc",u1_func}},
@@ -67,6 +67,13 @@ void ClassFile::parse_attribute(std::ifstream &f)
 	}
 }
 
+
+
+void method_info::parse_descriptor(cp_utf8_info* info)
+{
+
+}
+
 void ClassFile::parse_method(std::ifstream &f)
 {
 	methods_count = read2(f);
@@ -80,9 +87,12 @@ void ClassFile::parse_method(std::ifstream &f)
 		method_info * info = new method_info;
 		info->access_flags = read2(f);
 		info->name_index = read2(f);
-		info->descriptor_index = read2(f);
+		u2 descriptor_index = read2(f);
 		info->attributes_count = read2(f);
-		
+
+		cp_utf8_info* des_info = (cp_utf8_info*)constant_pool[descriptor_index];	
+		info->parse_descriptor(des_info);
+
 		if(info->attributes_count != 0)
 		{
 			info->attributes = new attribute_info*[info->attributes_count];
@@ -128,58 +138,18 @@ void ClassFile::fill_method_acc(u2 flags,std::string &s)
 
 void ClassFile::fill_method_name_and_arg(std::string& s,method_info* info)
 {
-	const char * des = (const char *)((cp_utf8_info*)(constant_pool[info->descriptor_index]))->bytes;
-	const char* name = (const char *)((cp_utf8_info*)(constant_pool[info->name_index]))->bytes;
-	int des_len = ((cp_utf8_info*)(constant_pool[info->descriptor_index]))->length;
-	if(des_len == 0)
-	{
-		return;
 	}
-	switch(des[des_len-1])
-	{
-		case 'V':
-		{
-			s += "void ";
-		}
-		break;
-		default:
-		{
-			printf("method:%s Return Descriptor:%c is not supported now!\n",name,des[des_len-1]);
-		}
-		break;
-	}
-	s += name;
-	s += '(';
-	int curpos = 0;
-	if(des[curpos++] != '(')
-	{
-		printf("method:%s expression invalid!\n",name);
-		return;
-	}
-	while(des[curpos] != ';')
-	{
-		int startpos = curpos;
-		while(des[curpos++] != '/' && des[curpos] != ';');
-		std::string sub(des,startpos,curpos-1);
-		s += sub;
-		if(des[curpos] != ';')
-		{
-			s+=',';
-		}
-	}
-	s += ')';
-}
 
 void ClassFile::print_method(method_info* info)
 {
 	if(!info)
 		return;
 	std::string method_descriptor;
+	printf("acc_tag:%d\n",info->access_flags);
 	fill_method_acc(info->access_flags,method_descriptor);
 	fill_method_name_and_arg(method_descriptor,info);	
 	printf("%s\n",method_descriptor.c_str());
 	//printf("name:%s\n",((cp_utf8_info*)(constant_pool[info->name_index]))->bytes);
-	printf("descriptor:%s\n",((cp_utf8_info*)(constant_pool[info->descriptor_index]))->bytes);
 	int cnt = 0;
 	for(int i = 0 ; i < info->attributes_count; ++i)
 	{
@@ -238,22 +208,12 @@ void ClassFile::parse_classmsg(std::ifstream &f)
 	access_flags = read2(f);
 	this_class = read2(f);
 	super_class = read2(f);
-
-#if DEBUG_TAG
-	cp_class_info* this_c = (cp_class_info*)constant_pool[super_class];
-	cp_utf8_info* tc_info = (cp_utf8_info*)constant_pool[this_c->name_index];
-	printf("super_class:%s\n",tc_info->bytes);
-#endif
 }
 
 void ClassFile::parse_constant_pool(std::ifstream &f)
 {
-	constant_pool_count = read2(f);
+	u2 constant_pool_count = read2(f);
 	printf("constant pool size:%d\n",constant_pool_count);
-	if(constant_pool_count > 0)
-	{
-		constant_pool = new cp_info*[constant_pool_count];
-	}
 	for(int i = 1; i < constant_pool_count; ++i)
 	{
 		u1 tag = read1(f);
@@ -378,15 +338,15 @@ void ClassFile::parse_constant_pool(std::ifstream &f)
 
 void ClassFile::parse_header(std::ifstream & f)
 {
-	magic = read4(f);
+	u4 magic = read4(f);
 	if(magic != MAGIC_NUMBER)
 	{
 		cout<<"magic_num wrong! cur_num:"<<
 			hex<<magic<<",mgnum:"<<MAGIC_NUMBER<<endl;
 		return;
 	}
-	minor_version = read2(f);
-	major_version = read2(f);
+	u2 minor_version = read2(f);
+	u2 major_version = read2(f);
 #if DEBUG_TAG
 	cout<<hex<<"ver:"<<minor_version<<"."<<major_version<<endl;
 #endif
